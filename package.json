@@ -4,7 +4,8 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "dev": "node src/index.js",
+    "dev-writer": "node src/index.js writer",
+    "dev-reader": "node src/index.js reader",
     "stg": "node src/index.js",
     "prd": "node src/index.js",
     "test": "echo \"Error: not yet available\" && exit 1"
@@ -30,12 +31,24 @@
     "@hyperswarm/testnet": "^3.1.4",
     "@hyperswarm/tunnel": "^1.1.2",
     "autobase": "^6.5.9",
+    "b4a": "^1.6.7",
+    "bare-fs": "^3.1.1",
+    "bare-pipe": "^3.3.8",
+    "bare-process": "^3.0.0",
+    "compact-encoding": "^2.15.0",
+    "corestore": "^6.18.4",
+    "debounceify": "^1.1.0",
     "hp-rpc-cli": "^0.0.5",
+    "hyperbeam": "^3.0.2",
     "hyperbee": "^2.20.4",
     "hypercore": "^10.37.25",
     "hyperdht": "^6.19.0",
     "hyperdrive": "^11.13.0",
     "hyperswarm": "^4.8.4",
+    "localdrive": "^1.12.1",
+    "mirror-drive": "^1.4.0",
+    "pear-stdio": "^1.0.1",
+    "protomux": "^3.10.0",
     "random-access-memory": "^6.2.1"
   }
 }
