@@ -22,6 +22,20 @@ import Localdrive from 'localdrive'
 
 console.log("Arguments:", Pear.config.args)
 
+let topicBuffer
+let topic
+if (Pear.config.args.length === 1 && Pear.config.args[0]) {
+	topicBuffer = b4a.from(Pear.config.args[0], 'utf8')
+	topic = b4a.toString(topicBuffer, 'utf8')
+} else if (Pear.config.args.length === 2 && Pear.config.args[1]) {
+	topicBuffer = b4a.from(Pear.config.args[0], 'utf8')
+	topic = b4a.toString(topicBuffer, 'utf8')
+} else {
+	topicBuffer = crypto.randomBytes(32)
+	topic = b4a.toString(topicBuffer, 'hex')
+}
+console.log("Topic:", topic)
+
 if (!Pear.config.args[0])
 	throw new Error("No server public key provided.")
 

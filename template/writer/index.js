@@ -17,27 +17,120 @@ import Hyperswarm from 'hyperswarm'
 import Localdrive from 'localdrive'
 // import stdio from 'pear-stdio'
 
+if (Pear.config.dev) {
+	const { Inspector } = await import('pear-inspect')
+	const inspector = await new Inspector()
+	const key = await inspector.enable()
+	console.log(`Debug with pear://runtime/devtools/${key.toString('hex')}`)
+}
+
 // const { versions } = Pear
 // console.log(await versions())
 
 console.log("Arguments:", Pear.config.args)
 
+const peers = {
+	"dht": {},
+	"swarm": {},
+};
+
 const dht = new DHT()
-const keyPair = DHT.keyPair()
-const server = dht.createServer(connection => {
-	console.log("Got connection!", connection)
+const swarm = new Hyperswarm()
 
-	process.stdin.pipe(connection).pipe(process.stdout)
-})
-server.listen(keyPair).then(() => {
-	const publicKey = b4a.toString(keyPair.publicKey, 'hex')
+let topicBuffer
+let topic
+if (Pear.config.args.length === 1 && Pear.config.args[0]) {
+	topicBuffer = b4a.from(Pear.config.args[0], 'utf8')
+	topic = b4a.toString(topicBuffer, 'utf8')
+} else if (Pear.config.args.length === 2 && Pear.config.args[1]) {
+	topicBuffer = b4a.from(Pear.config.args[0], 'utf8')
+	topic = b4a.toString(topicBuffer, 'utf8')
+} else {
+	topicBuffer = crypto.randomBytes(32)
+	topic = b4a.toString(topicBuffer, 'hex')
+}
+console.log("Topic:", topic)
 
-	console.log('Listening on:', publicKey)
-})
+// const keyPair = DHT.keyPair()
+// const server = dht.createServer(connection => {
+// 	const peerPublicKey = b4a.toString(connection.remotePublicKey, 'hex')
+//
+// 	console.log("Connected to dht peer: ", peerPublicKey)
+//
+// 	peers.dht[peerPublicKey] = connection
+//
+// 	process.stdin.pipe(connection).pipe(process.stdout)
+// })
+// server.listen(keyPair).then(() => {
+// 	const publicKey = b4a.toString(keyPair.publicKey, 'hex')
+//
+// 	console.log('Listening on:', publicKey)
+// })
+
 Pear.teardown(() => {
-	console.log("Tearing down server.")
+	console.log("Tearing down...")
 
-	server.close()
+	if (server) {
+		server.close ()
+		console.log ("Server closed.")
+	}
 
-	console.log("Server closed. Teared down.")
+	if (swarm) {
+		swarm.destroy ()
+		console.log ("Swarm destroyed.")
+	}
+
+	console.log("Teared down.")
+})
+
+swarm.on('connection', connection => {
+	const peerPublicKey = b4a.toString(connection.remotePublicKey, 'hex')
+
+	console.log("Connected to swarm peer: ", peerPublicKey)
+
+	peers.swarm[peerPublicKey] = connection
+
+	console.log(Object.keys(peers.swarm))
+
+	connection.once('close', () => {
+		console.log("Disconnecting from peer: ", peerPublicKey)
+
+		delete peers.swarm[peerPublicKey]
+
+		console.log("Disconnected from peer: ", peerPublicKey)
+	})
+
+	connection.on('data', data => {
+		console.log(`Received data from peer ${peerPublicKey}: ${data}`)
+	})
+
+	connection.on('error', error => {
+		console.log(`An error has occurred while communicating with peer ${peerPublicKey}: ${error}`)
+	})
+})
+
+// Broadcast stdin data to all connections
+process.stdin.on('data', data => {
+	const dataString = data.toString('utf8')
+	console.log("Broadcasting data to all peers: ", dataString)
+	console.log(Object.keys(peers.dht))
+
+	for (const [key, connection] of Object.entries(peers.swarm)) {
+		connection.write(data)
+
+		console.log("Broadcasted data to peer: ", key)
+	}
+})
+
+// Join a common topic
+const discovery = swarm.join(
+	topicBuffer,
+	{
+		client: true, server: true
+	}
+)
+
+// The flushed promise will resolve when the topic has been fully announced to the DHT
+discovery.flushed().then(() => {
+	console.log('Joined topic:', topic)
 })
