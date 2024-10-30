@@ -5,7 +5,8 @@ import Corestore from 'corestore';
 import b4a from 'b4a';
 import RPC from '@hyperswarm/rpc';
 import crypto from 'hypercore-crypto';
-// import process from 'bare-process'
+
+let peerId;
 
 // Setup corestore and Hyperbee
 const corestore = new Corestore(`./resources/databases/${process.argv[2]}`);
@@ -19,10 +20,7 @@ const auctionDB = new Hyperbee(corestore.get({ name: 'auctions' }), {
 const dht = new DHT();
 const swarm = new Hyperswarm();
 const rpc = new RPC({ dht });
-// const topicBuffer = process.argv[3] ? b4a.from(process.argv[3], 'utf8') : crypto.randomBytes(32)
-// const topicBuffer = crypto.randomBytes(32)
-const topicBuffer = b4a.from('6784d5911c9b9f67aa2704a506e3905b3cc27e121c27a85d67f0751cddc10c15', 'hex')
-
+const topicBuffer = b4a.from('6784d5911c9b9f67aa2704a506e3905b3cc27e121c17a85d67f0751cddc10c10', 'hex');
 const topic = b4a.toString(topicBuffer, 'hex');
 
 // Create RPC server
@@ -33,6 +31,7 @@ server.on('listening', () => {
 	console.log(`Server is listening on publicKey: ${server.address().publicKey.toString('hex')}`);
 });
 
+// Create Auction Handler
 server.respond('createAuction', async (req) => {
 	const { id, description, price } = JSON.parse(b4a.toString(req));
 	await auctionDB.put(id, { description, price, bids: [], closed: false });
@@ -41,6 +40,7 @@ server.respond('createAuction', async (req) => {
 	return b4a.from(JSON.stringify({ success: true, id }), "utf8");
 });
 
+// Make Bid Handler
 server.respond('makeBid', async (req) => {
 	const { auctionId, bidder, bidAmount } = JSON.parse(b4a.toString(req));
 	const auction = await auctionDB.get(auctionId);
@@ -51,9 +51,18 @@ server.respond('makeBid', async (req) => {
 	await auctionDB.put(auctionId, auction.value);
 	console.log(`Bid made for Auction ${auctionId} by ${bidder} for ${bidAmount} USDt`);
 	broadcastToAll('bidMade', { auctionId, bidder, bidAmount });
-	return { success: true, auctionId };
+	return b4a.from(JSON.stringify({ success: true, auctionId }), "utf8");
 });
 
+server.respond('closeAuction', async (req) => {
+	const {
+		message,
+	} = JSON.parse (b4a.toString (req));
+
+	console.log("Received aloha message:", message);
+});
+
+// Close Auction Handler
 server.respond('closeAuction', async (req) => {
 	const { auctionId, closingInfo } = JSON.parse(b4a.toString(req));
 	const auction = await auctionDB.get(auctionId);
@@ -65,14 +74,44 @@ server.respond('closeAuction', async (req) => {
 	await auctionDB.put(auctionId, auction.value);
 	console.log(`Auction ${auctionId} closed.`);
 	broadcastToAll('auctionClosed', { auctionId, closingInfo });
-	return { success: true, auctionId };
+	return b4a.from(JSON.stringify({ success: true, auctionId }), "utf8");
+});
+
+// RPC handlers to synchronize Hyperbee database with broadcasted events
+server.respond('auctionCreated', async (req) => {
+	const { id, description, price } = JSON.parse(b4a.toString(req));
+	await auctionDB.put(id, { description, price, bids: [], closed: false });
+	console.log(`Synchronized new auction: ${id}`);
+});
+
+server.respond('bidMade', async (req) => {
+	const { auctionId, bidder, bidAmount } = JSON.parse(b4a.toString(req));
+	const auction = await auctionDB.get(auctionId);
+	if (!auction || auction.value.closed) {
+		throw new Error('Auction not found or already closed');
+	}
+	auction.value.bids.push({ bidder, amount: bidAmount });
+	await auctionDB.put(auctionId, auction.value);
+	console.log(`Synchronized new bid for Auction ${auctionId} by ${bidder} for ${bidAmount} USDt`);
+});
+
+server.respond('auctionClosed', async (req) => {
+	const { auctionId, closingInfo } = JSON.parse(b4a.toString(req));
+	const auction = await auctionDB.get(auctionId);
+	if (!auction) {
+		throw new Error('Auction not found');
+	}
+	auction.value.closed = true;
+	auction.value.closingInfo = closingInfo;
+	await auctionDB.put(auctionId, auction.value);
+	console.log(`Synchronized auction close for ${auctionId}`);
 });
 
 // Handle incoming connections
 swarm.on('connection', (connection, info) => {
-	console.log('New connection established');
+	peerId = b4a.toString(info.publicKey, 'hex');
+	console.log(`New connection established ${peerId}`);
 	// rpc.pipe(connection).pipe(rpc);
-	process.stdin.pipe(connection).pipe(process.stdout);
 });
 
 // Join Hyperswarm topic for auction
@@ -83,14 +122,18 @@ const discovery = swarm.join(topicBuffer, {
 
 discovery.flushed().then(() => {
 	console.log(`Joined auction topic: ${topic}`);
+	const publicKey = b4a.toString(swarm.keyPair.publicKey, 'hex');
+
+	console.log(`Public key: ${publicKey}`);
 });
 
 // Helper function to broadcast events to all connected peers
 async function broadcastToAll(method, data) {
+	const encoded = b4a.from(JSON.stringify(data), "utf8");
 	for (const peer of swarm.peers) {
 		try {
-			const encoded = b4a.from(JSON.stringify(data), "utf8")
-			await rpc.request(peer[1].publicKey, method, encoded);
+			// await rpc.request(peer[1].publicKey, method, encoded);
+			await rpc.request(b4a.from(peerId, 'hex'), method, encoded);
 		} catch (error) {
 			console.error(`Error broadcasting ${method}:`, error);
 		}
@@ -100,7 +143,9 @@ async function broadcastToAll(method, data) {
 // Example commands via stdin for testing
 process.stdin.on('data', (input) => {
 	const command = input.toString().trim();
-	if (command.startsWith('create')) {
+	if (command.startsWith('test')) {
+		broadcastToAll('test', { message: 'Hello from server!' });
+	} else if (command.startsWith('create')) {
 		const id = `auction-${Date.now()}`;
 		const description = `Pic#${Math.floor(Math.random() * 1000)}`;
 		const price = Math.floor(Math.random() * 100);
