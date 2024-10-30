@@ -26,6 +26,7 @@
     "hyperdht": "^6.19.0",
     "hyperdrive": "^11.13.0",
     "hyperswarm": "^4.8.4",
-    "localdrive": "^1.12.1"
+    "localdrive": "^1.12.1",
+    "pear-inspect": "^1.2.3"
   }
 }
