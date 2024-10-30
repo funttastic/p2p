@@ -1,0 +1,27 @@
+{
+  "name": "drive-writer",
+  "main": "index.js",
+  "pear": {
+    "name": "drive-writer",
+    "type": "terminal"
+  },
+  "type": "module",
+  "license": "Apache-2.0",
+  "scripts": {
+    "dev": "pear run -d .",
+    "test": "brittle test/*.test.js"
+  },
+  "devDependencies": {
+    "brittle": "^3.0.0",
+    "pear-interface": "^1.0.0"
+  },
+  "dependencies": {
+    "b4a": "^1.6.7",
+    "corestore": "^6.18.4",
+    "debounceify": "^1.1.0",
+    "hyperdrive": "^11.13.0",
+    "hyperswarm": "^4.8.4",
+    "localdrive": "^1.12.1",
+    "pear-stdio": "^1.0.1"
+  }
+}

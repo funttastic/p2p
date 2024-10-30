@@ -1,0 +1,16 @@
+{
+  "name": "p2p-guessing-number-game",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node index.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "hyperswarm": "^4.7.14",
+    "readline": "^1.3.0"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "name": "two-peers",
+  "main": "index.js",
+  "pear": {
+    "name": "two-peers",
+    "type": "terminal"
+  },
+  "type": "module",
+  "license": "Apache-2.0",
+  "scripts": {
+    "dev": "pear run -d .",
+    "test": "brittle test/*.test.js"
+  },
+  "devDependencies": {
+    "brittle": "^3.0.0",
+    "pear-interface": "^1.0.0"
+  },
+  "dependencies": {
+    "b4a": "^1.6.7",
+    "bare-process": "^3.0.0",
+    "hyperdht": "^6.19.0"
+  }
+}

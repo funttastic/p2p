@@ -1,0 +1,23 @@
+{
+  "name": "reader",
+  "main": "index.js",
+  "pear": {
+    "name": "reader",
+    "type": "terminal"
+  },
+  "type": "module",
+  "license": "Apache-2.0",
+  "scripts": {
+    "dev": "pear run -d .",
+    "test": "brittle test/*.test.js"
+  },
+  "devDependencies": {
+    "brittle": "^3.0.0",
+    "pear-interface": "^1.0.0"
+  },
+  "dependencies": {
+    "bare-path": "^3.0.0",
+    "hypercore": "^10.37.25",
+    "hyperswarm": "^4.8.4"
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "name": "auction",
+  "author": "Danilo Araújo Silva",
+  "license": "CC-BY-NC-ND-4.0",
+  "description": "Peer to peer application.",
+  "main": "index.js",
+  "pear": {
+    "name": "auction",
+    "type": "terminal"
+  },
+  "type": "module",
+  "scripts": {
+    "dev": "node index.js",
+		"dev-client": "node client.js",
+		"pear-dev": "pear run --dev .",
+    "test": "node_modules/.bin/brittle test/*.test.js"
+  },
+  "devDependencies": {
+    "brittle": "^3.0.0",
+    "pear-interface": "^1.0.0"
+  },
+  "dependencies": {
+    "@hyperswarm/rpc": "^3.3.2",
+    "b4a": "^1.6.7",
+    "bare-process": "^3.0.0",
+    "corestore": "^6.18.4",
+    "debounceify": "^1.1.0",
+    "hyperbee": "^2.20.4",
+    "hypercore": "^10.37.25",
+    "hypercore-crypto": "^3.4.2",
+    "hyperdht": "^6.19.0",
+    "hyperdrive": "^11.13.0",
+    "hyperswarm": "^4.8.4",
+    "localdrive": "^1.12.1",
+    "pear-inspect": "^1.2.3"
+  }
+}
