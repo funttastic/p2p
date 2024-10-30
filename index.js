@@ -136,7 +136,7 @@ rpcServer.respond('echo', async (request) => {
 })
 
 rpcServer.respond('createAuction', async (request) => {
-	const { id, description, price, status } = decodeObject(request)
+	const { id, description, price, status, bids, closingInfo } = decodeObject(request)
 
 	const auction = { id, description, price, status: 'open', bids: [], closingInfo: {} }
 
@@ -153,9 +153,9 @@ rpcServer.respond('createAuction', async (request) => {
 })
 
 rpcServer.respond('makeBid', async (request) => {
-	const { auctionId, bidder, bidAmount } = decodeObject(request)
+	const { id, bidder, bidAmount } = decodeObject(request)
 
-	const auction = (await db.get(auctionId))?.value
+	const auction = (await db.get(id))?.value
 
 	if (!auction || auction.status !== 'open') {
 		throw new Error('Auction not found or already closed')
@@ -163,9 +163,9 @@ rpcServer.respond('makeBid', async (request) => {
 
 	auction.bids.push({ bidder, amount: bidAmount })
 
-	await db.put(auctionId, auction.value)
+	await db.put(id, auction.value)
 
-	console.log(`Bid made for Auction ${auctionId} by ${bidder} for ${bidAmount} USDT`)
+	console.log(`Bid made for Auction ${id} by ${bidder} for ${bidAmount} USDT`)
 
 	await broadcastToAll('bidMade', auction)
 
@@ -176,9 +176,9 @@ rpcServer.respond('makeBid', async (request) => {
 })
 
 rpcServer.respond('closeAuction', async (request) => {
-	const { auctionId } = decodeObject(request)
+	const { id } = decodeObject(request)
 
-	const auction = (await db.get(auctionId))?.value
+	const auction = (await db.get(id))?.value
 
 	if (!auction || auction.status !== 'open') {
 		throw new Error('Auction not found or has already been closed.')
@@ -196,9 +196,9 @@ rpcServer.respond('closeAuction', async (request) => {
 
 	auction.closingInfo = closingInfo
 
-	await db.put(auctionId, auction)
+	await db.put(id, auction)
 
-	console.log(`Auction ${auctionId} closed.`)
+	console.log(`Auction ${id} closed.`)
 
 	await broadcastToAll('auctionClosed', auction)
 
@@ -270,18 +270,42 @@ const stdin = process.stdin
 stdin.on('data', async (input) => {
 	const command = input.toString().trim()
 
-	if (command.startsWith('test')) {
-		await broadcastToAll('test', { message: 'Hello from server!' })
+	if (!command)
+		return
+
+	const parts = command.split(' ')
+
+	if (command.startsWith('echo')) {
+		await broadcastToAll('echo', { message: parts[1] ?? 'Hello world!' })
 	} else if (command.startsWith('create')) {
-		const auction = {
-			id: `auction-${Date.now()}`,
-			description: `Pic#${Math.floor(Math.random() * 1000)}`,
-			price: Math.floor(Math.random() * 100),
+		const payload = {
+			id: parts[1] ?? `auction-${Date.now()}`,
+			description: parts[2] ?? `Pic#${Math.floor(Math.random() * 1000)}`,
+			price: parts[3] ? parseFloat(parts[3]) : Math.floor(Math.random() * 100),
 			status: 'open',
-			bids: []
+			bids: [],
+			closingInfo: {}
 		}
 
-		rpc.request(server.address().publicKey, 'createAuction', encodeObject(auction))
+		rpc.request(rpcServerPublicKey, 'createAuction', encodeObject(payload))
+			.then(console.log)
+			.catch(console.error)
+	} else if (command.startsWith('bid')) {
+		const payload = {
+			auctionId: parts[1],
+			bidder: id,
+			bidAmount: parseFloat(parts[2]) ?? Math.floor(Math.random() * 100)
+		}
+
+		rpc.request(rpcServerPublicKey, 'makeBid', encodeObject(payload))
+			.then(console.log)
+			.catch(console.error)
+	} else if (command.startsWith('close')) {
+		const payload = {
+			id: parts[1]
+		}
+
+		rpc.request(rpcServerPublicKey, 'makeBid', encodeObject(payload))
 			.then(console.log)
 			.catch(console.error)
 	}
