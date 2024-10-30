@@ -42,7 +42,7 @@ if (!Pear.config.args[0])
 const serverPublicKey = b4a.from(Pear.config.args[0], 'hex')
 
 const dht = new DHT()
-const connection = dht.connect(serverPublicKey)
+const connection = dht.connect(topic)
 connection.once('open', () => {
 	console.log('Got connection!')
 })

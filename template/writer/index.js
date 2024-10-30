@@ -21,7 +21,7 @@ if (Pear.config.dev) {
 	const { Inspector } = await import('pear-inspect')
 	const inspector = await new Inspector()
 	const key = await inspector.enable()
-	console.log(`Debug with pear://runtime/devtools/${key.toString('hex')}`)
+	console.log(`Debug with pear://runtime/devtools/${key.toString('hex')}\n`)
 }
 
 // const { versions } = Pear
@@ -30,8 +30,6 @@ if (Pear.config.dev) {
 console.log("Arguments:", Pear.config.args)
 
 const peers = {
-	"dht": {},
-	"swarm": {},
 };
 
 const dht = new DHT()
@@ -57,7 +55,7 @@ console.log("Topic:", topic)
 //
 // 	console.log("Connected to dht peer: ", peerPublicKey)
 //
-// 	peers.dht[peerPublicKey] = connection
+// 	peers[peerPublicKey] = connection
 //
 // 	process.stdin.pipe(connection).pipe(process.stdout)
 // })
@@ -88,14 +86,14 @@ swarm.on('connection', connection => {
 
 	console.log("Connected to swarm peer: ", peerPublicKey)
 
-	peers.swarm[peerPublicKey] = connection
+	peers[peerPublicKey] = connection
 
-	console.log(Object.keys(peers.swarm))
+	console.log(Object.keys(peers))
 
 	connection.once('close', () => {
 		console.log("Disconnecting from peer: ", peerPublicKey)
 
-		delete peers.swarm[peerPublicKey]
+		delete peers[peerPublicKey]
 
 		console.log("Disconnected from peer: ", peerPublicKey)
 	})
@@ -113,9 +111,9 @@ swarm.on('connection', connection => {
 process.stdin.on('data', data => {
 	const dataString = data.toString('utf8')
 	console.log("Broadcasting data to all peers: ", dataString)
-	console.log(Object.keys(peers.dht))
+	console.log(Object.keys(peers))
 
-	for (const [key, connection] of Object.entries(peers.swarm)) {
+	for (const [key, connection] of Object.entries(peers)) {
 		connection.write(data)
 
 		console.log("Broadcasted data to peer: ", key)

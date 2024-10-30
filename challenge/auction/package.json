@@ -1,23 +1,25 @@
 {
-  "name": "reader",
-	"author": "Danilo Araújo Silva",
-	"license": "CC-BY-NC-ND-4.0",
-	"description": "Peer to peer application.",
+  "name": "auction",
+  "author": "Danilo Araújo Silva",
+  "license": "CC-BY-NC-ND-4.0",
+  "description": "Peer to peer application.",
   "main": "index.js",
   "pear": {
-    "name": "reader",
+    "name": "auction",
     "type": "terminal"
   },
   "type": "module",
   "scripts": {
-    "dev": "pear run --dev .",
-    "test": "./node_modules/.bin/brittle test/*.test.js"
+    "dev": "node index.js",
+		"pear-dev": "pear run --dev .",
+    "test": "node_modules/.bin/brittle test/*.test.js"
   },
   "devDependencies": {
     "brittle": "^3.0.0",
     "pear-interface": "^1.0.0"
   },
   "dependencies": {
+    "@hyperswarm/rpc": "^3.3.2",
     "b4a": "^1.6.7",
     "bare-process": "^3.0.0",
     "corestore": "^6.18.4",
