@@ -8,7 +8,7 @@ import crypto from 'hypercore-crypto';
 // import process from 'bare-process'
 
 // Setup corestore and Hyperbee
-const corestore = new Corestore(`./data/${process.argv[2]}`);
+const corestore = new Corestore(`./resources/databases/${process.argv[2]}`);
 await corestore.ready();
 const auctionDB = new Hyperbee(corestore.get({ name: 'auctions' }), {
 	keyEncoding: 'utf-8',
@@ -19,8 +19,11 @@ const auctionDB = new Hyperbee(corestore.get({ name: 'auctions' }), {
 const dht = new DHT();
 const swarm = new Hyperswarm();
 const rpc = new RPC({ dht });
-const topicBuffer = process.argv[3] ? b4a.from(process.argv[3], 'utf8') : crypto.randomBytes(32)
-const topic = b4a.toString(topicBuffer, 'utf8');
+// const topicBuffer = process.argv[3] ? b4a.from(process.argv[3], 'utf8') : crypto.randomBytes(32)
+// const topicBuffer = crypto.randomBytes(32)
+const topicBuffer = b4a.from('6784d5911c9b9f67aa2704a506e3905b3cc27e121c27a85d67f0751cddc10c15', 'hex')
+
+const topic = b4a.toString(topicBuffer, 'hex');
 
 // Create RPC server
 const server = rpc.createServer();
@@ -66,7 +69,7 @@ server.respond('closeAuction', async (req) => {
 });
 
 // Handle incoming connections
-swarm.on('connection', (connection) => {
+swarm.on('connection', (connection, info) => {
 	console.log('New connection established');
 	rpc.pipe(connection).pipe(rpc);
 });

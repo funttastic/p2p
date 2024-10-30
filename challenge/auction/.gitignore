@@ -17,8 +17,8 @@ typings/
 ../node_modules/
 /.vscode/
 
-# Storage
-storage/
+# Databases
+resources/databases/
 
 # Temporary
 temporary/
