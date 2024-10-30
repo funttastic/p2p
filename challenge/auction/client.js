@@ -1,14 +1,20 @@
-'use strict'
+// 'use strict'
 
-const RPC = require('@hyperswarm/rpc')
+// const RPC = require('@hyperswarm/rpc')
+//
+// const DHT = require('hyperdht')
+//
+// const Hypercore = require('hypercore')
+//
+// const Hyperbee = require('hyperbee')
+//
+// const crypto = require('crypto')
 
-const DHT = require('hyperdht')
-
-const Hypercore = require('hypercore')
-
-const Hyperbee = require('hyperbee')
-
-const crypto = require('crypto')
+import RPC from '@hyperswarm/rpc';
+import Hyperbee from 'hyperbee';
+import Hypercore from 'hypercore';
+import crypto from 'hypercore-crypto';
+import DHT from 'hyperdht';
 
 const main = async () => {
 
@@ -48,7 +54,7 @@ const main = async () => {
 
 	// public key of rpc server, used instead of address, the address is discovered via dht
 
-	const serverPubKey = Buffer.from('763cdd329d29dc35326865c4fa9bd33a45fdc2d8d2564b11978ca0d022a44a19', 'hex')
+	const serverPubKey = Buffer.from('b1fd2682a72f9bc35b98eeb1bf638b9f69247978b6d28e4060c6f0b82494aa02', 'hex')
 
 	// rpc lib
 

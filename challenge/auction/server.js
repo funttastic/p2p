@@ -1,14 +1,20 @@
-'use strict'
+// 'use strict'
 
-const RPC = require('@hyperswarm/rpc')
+// const RPC = require('@hyperswarm/rpc')
+//
+// const DHT = require('hyperdht')
+//
+// const Hypercore = require('hypercore')
+//
+// const Hyperbee = require('hyperbee')
+//
+// const crypto = require('crypto')
 
-const DHT = require('hyperdht')
-
-const Hypercore = require('hypercore')
-
-const Hyperbee = require('hyperbee')
-
-const crypto = require('crypto')
+import RPC from '@hyperswarm/rpc';
+import Hyperbee from 'hyperbee';
+import Hypercore from 'hypercore';
+import crypto from 'hypercore-crypto';
+import DHT from 'hyperdht';
 
 const main = async () => {
 
