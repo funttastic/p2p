@@ -1,11 +1,11 @@
 import RPC from '@hyperswarm/rpc'
 import Hyperbee from 'hyperbee'
-import Hypercore from 'hypercore'
+// import Hypercore from 'hypercore'
 import crypto from 'hypercore-crypto'
 import DHT from 'hyperdht'
 import b4a from 'b4a'
 import Hyperswarm from 'hyperswarm'
-import Corestore from 'corestore';
+import Corestore from 'corestore'
 // import Pipe from 'bare-pipe'
 // import path from 'bare-path'
 // import process from 'bare-process'
@@ -138,26 +138,100 @@ rpcServer.respond('echo', async (request) => {
 rpcServer.respond('createAuction', async (request) => {
 	const { id, description, price, status } = decodeObject(request)
 
-	const item = { id, description, price, status: 'open', bids: [] }
+	const auction = { id, description, price, status: 'open', bids: [], closingInfo: {} }
 
-	await db.put(id, item)
+	await db.put(id, auction)
 
 	console.log(`Successfully created the auction ${id}`)
 
-	await broadcastToAll('auctionCreated', item)
+	await broadcastToAll('auctionCreated', auction)
 
 	return encodeObject({
-		payload: item,
+		payload: auction,
+		status: 'ok'
+	})
+})
+
+rpcServer.respond('makeBid', async (request) => {
+	const { auctionId, bidder, bidAmount } = decodeObject(request)
+
+	const auction = (await db.get(auctionId))?.value
+
+	if (!auction || auction.status !== 'open') {
+		throw new Error('Auction not found or already closed')
+	}
+
+	auction.bids.push({ bidder, amount: bidAmount })
+
+	await db.put(auctionId, auction.value)
+
+	console.log(`Bid made for Auction ${auctionId} by ${bidder} for ${bidAmount} USDT`)
+
+	await broadcastToAll('bidMade', auction)
+
+	return encodeObject({
+		payload: auction,
+		status: 'ok'
+	})
+})
+
+rpcServer.respond('closeAuction', async (request) => {
+	const { auctionId } = decodeObject(request)
+
+	const auction = (await db.get(auctionId))?.value
+
+	if (!auction || auction.status !== 'open') {
+		throw new Error('Auction not found or has already been closed.')
+	}
+
+	auction.status = 'closed'
+
+	const closingInfo = { winner: null, amount: null }
+	for (const bid of auction.bids) {
+		if (!closingInfo.amount || bid.amount > closingInfo.amount) {
+			closingInfo.winner = bid.bidder
+			closingInfo.amount = bid.amount
+		}
+	}
+
+	auction.closingInfo = closingInfo
+
+	await db.put(auctionId, auction)
+
+	console.log(`Auction ${auctionId} closed.`)
+
+	await broadcastToAll('auctionClosed', auction)
+
+	return encodeObject({
+		payload: auction,
 		status: 'ok'
 	})
 })
 
 rpcServer.respond('auctionCreated', async (request) => {
-	const item = decodeObject(request)
+	const auction = decodeObject(request)
 
-	await db.put(item.id, item)
+	await db.put(auction.id, auction)
 
 	console.log(`Successfully synchronized new auction ${id}`)
+})
+
+rpcServer.respond('bidMade', async (request) => {
+	const auction = decodeObject(request)
+
+	const bidding = auction.bids[auction.bids.length - 1]
+
+	db.put(auction.id, auction)
+
+	console.log(`Synchronized new bid for Auction ${auction.id} by ${bidding.bidder} for ${bidding.amount} USDT`)
+})
+
+rpcServer.respond('auctionClosed', async (request) => {
+	const auction = decodeObject(request)
+
+	await db.put(auction.id, auction)
+
+	console.log(`Synchronized auction close for ${auction.id}`)
 })
 
 // const discovery = swarm.join(core.discoveryKey, {
@@ -181,13 +255,9 @@ swarm.on('connection', (connection, peerInfo) => {
 async function broadcastToAll(method, data) {
 	const encoded = encodeObject(data)
 
-	await rpc.request(encodeHex('8f7ab85e6cbbef3bbe8b74156eae658ad6478cc35744b47bfad71ec931a73ae0'), 'echo', encodeObject({ message: 'test' }))
-
 	for (const [key, peer] of swarm.peers) {
 		try {
-			// await rpc.request(peer.publicKey, method, encoded)
-			// const client = rpc.connect(peer.publicKey)
-			// await client.request('echo', b4a.from('hello world', 'utf8'))
+			await rpc.request(peer.publicKey, method, encoded)
 		} catch (error) {
 			console.error(`Error broadcasting ${method}:`, error)
 		}
