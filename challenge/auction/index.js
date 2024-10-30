@@ -71,7 +71,8 @@ server.respond('closeAuction', async (req) => {
 // Handle incoming connections
 swarm.on('connection', (connection, info) => {
 	console.log('New connection established');
-	rpc.pipe(connection).pipe(rpc);
+	// rpc.pipe(connection).pipe(rpc);
+	process.stdin.pipe(connection).pipe(process.stdout);
 });
 
 // Join Hyperswarm topic for auction
@@ -89,7 +90,7 @@ async function broadcastToAll(method, data) {
 	for (const peer of swarm.peers) {
 		try {
 			const encoded = b4a.from(JSON.stringify(data), "utf8")
-			await rpc.request(peer.publicKey, method, encoded);
+			await rpc.request(peer[1].publicKey, method, encoded);
 		} catch (error) {
 			console.error(`Error broadcasting ${method}:`, error);
 		}
