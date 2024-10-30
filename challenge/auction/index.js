@@ -2,7 +2,8 @@ import RPC from '@hyperswarm/rpc'
 import b4a from 'b4a'
 import Corestore from 'corestore'
 import Hyperbee from 'hyperbee'
-// import DHT from 'hyperdht'
+import crypto from 'hypercore-crypto'
+import DHT from 'hyperdht'
 import Hyperswarm from 'hyperswarm'
 // import Pipe from 'bare-pipe'
 // import path from 'bare-path'
@@ -22,7 +23,7 @@ import Hyperswarm from 'hyperswarm'
 const environment = 'development'
 
 // const arguments = Pear.config.args
-const args = process.argv.slice(1)
+const args = process.argv.slice(2)
 console.log("Arguments:", args)
 
 // const id = Pear.config.args[0]
@@ -33,7 +34,8 @@ const databaseFolder = './resources/databases'
 
 let topic
 if (environment === 'development') {
-	topic = '0000000000000000000000000000000000000000000000000000000000000000'
+	// topic = '0000000000000000000000000000000000000000000000000000000000000000'
+	topic = b4a.toString(crypto.randomBytes(32))
 } else {
 	topic = args[1] ? args[1] : b4a.toString(crypto.randomBytes(64), 'hex')
 }
@@ -41,15 +43,15 @@ const topicBuffer = b4a.from(topic, 'utf8')
 
 const peers = {}
 
-// const dht = new DHT()
+const dht = new DHT()
 
-const corestore = new Corestore(databaseFolder, id)
-await corestore.ready()
+const store = new Corestore(databaseFolder, id)
+await store.ready()
 
 const swarm = new Hyperswarm()
 
-const rpc = new RPC({ dth: swarm.dht })
-// const rpc = new RPC({ dht })
+// const rpc = new RPC({ dth: swarm.dht })
+const rpc = new RPC({ dht })
 
 const core = store.get({ name: 'auctions' })
 
@@ -65,21 +67,21 @@ await core.ready()
 
 const server = rpc.createServer()
 
-Pear.teardown(async () => {
-	console.log("Tearing down...")
-
-	if (swarm) {
-		await swarm.destroy()
-		console.log("Swarm destroyed.")
-	}
-
-	if (server) {
-		await server.close()
-		console.log("Server closed.")
-	}
-
-	console.log("Tear down complete.")
-})
+// Pear.teardown(async () => {
+// 	console.log("Tearing down...")
+//
+// 	if (swarm) {
+// 		await swarm.destroy()
+// 		console.log("Swarm destroyed.")
+// 	}
+//
+// 	if (server) {
+// 		await server.close()
+// 		console.log("Server closed.")
+// 	}
+//
+// 	console.log("Tear down complete.")
+// })
 
 await server.listen()
 
@@ -129,7 +131,7 @@ server.respond('auctionCreated', async (request) => {
 })
 
 swarm.on('connection', (connection, peerInfo) => {
-	corestore.replicate(connection)
+	store.replicate(connection)
 
 	const peerPublicKey = decodeHex(peerInfo.publicKey)
 
