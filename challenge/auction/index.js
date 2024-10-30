@@ -30,28 +30,34 @@ console.log("Arguments:", args)
 const id = args[0]
 
 // const databaseFolder = Pear.config.storage
-const databaseFolder = './resources/databases'
+const databaseFolder = `./resources/databases/${id}`
 
 let topic
+let topicBuffer
 if (environment === 'development') {
-	// topic = '0000000000000000000000000000000000000000000000000000000000000000'
-	topic = b4a.toString(crypto.randomBytes(32))
+	// topic = b4a.toString(crypto.randomBytes(32), 'hex')
+
+	topic = '0000000000000000000000000000000000000000000000000000000000000000'
+	topicBuffer = b4a.from(topic, 'hex')
+
+	// topicBuffer = crypto.randomBytes(32)
+	// topic = b4a.toString(topicBuffer, 'hex')
 } else {
 	topic = args[1] ? args[1] : b4a.toString(crypto.randomBytes(64), 'hex')
+	topicBuffer = b4a.from(topic, 'hex')
 }
-const topicBuffer = b4a.from(topic, 'utf8')
 
 const peers = {}
 
-const dht = new DHT()
+// const dht = new DHT()
 
 const store = new Corestore(databaseFolder, id)
 await store.ready()
 
 const swarm = new Hyperswarm()
 
-// const rpc = new RPC({ dth: swarm.dht })
-const rpc = new RPC({ dht })
+const rpc = new RPC({ dth: swarm.dht })
+// const rpc = new RPC({ dht })
 
 const core = store.get({ name: 'auctions' })
 
@@ -101,9 +107,15 @@ server.on('close', () => {
 const encodeHex = (data) => b4a.from(data, 'hex')
 const decodeHex = (data) => b4a.toString(data, 'hex')
 const encodeString = (data) => b4a.from(data, 'utf8')
-const decodeString = (data) => b4a.toString(data, 'utf8')
+const decodeString = (data) => b4a.toString(data)
 const encodeObject = (data) => b4a.from(JSON.stringify(data), 'utf8')
 const decodeObject = (data) => JSON.parse(b4a.toString(data, 'utf8'))
+
+server.respond('echo', (request) => {
+	console.log('echo:', request)
+
+	return request
+})
 
 server.respond('createAuction', async (request) => {
 	const { id, description, price, status } = decodeObject(request)
@@ -153,7 +165,9 @@ async function broadcastToAll(method, data) {
 
 	for (const [key, peer] of swarm.peers) {
 		try {
-			await rpc.request(peer.publicKey, method, encoded)
+			// await rpc.request(peer.publicKey, method, encoded)
+			const client = rpc.connect(peer.publicKey)
+			await client.request('echo', b4a.from('hello world', 'utf8'))
 		} catch (error) {
 			console.error(`Error broadcasting ${method}:`, error)
 		}
