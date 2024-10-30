@@ -1,11 +1,10 @@
 import RPC from '@hyperswarm/rpc'
+import b4a from 'b4a'
+import Corestore from 'corestore'
 import Hyperbee from 'hyperbee'
-import Hypercore from 'hypercore'
 import crypto from 'hypercore-crypto'
 import DHT from 'hyperdht'
-import b4a from 'b4a'
 import Hyperswarm from 'hyperswarm'
-import Corestore from 'corestore';
 // import Pipe from 'bare-pipe'
 // import path from 'bare-path'
 // import process from 'bare-process'
@@ -30,73 +29,65 @@ console.log("Arguments:", args)
 // const id = Pear.config.args[0]
 const id = args[0]
 
-// const databaseFolder = `${Pear.config.storage}/${id}`
+// const databaseFolder = Pear.config.storage
 const databaseFolder = `./resources/databases/${id}`
-
-const encodeHex = (data) => b4a.from(data, 'hex')
-const decodeHex = (data) => b4a.toString(data, 'hex')
-const encodeString = (data) => b4a.from(data, 'utf8')
-const decodeString = (data) => b4a.toString(data)
-const encodeObject = (data) => b4a.from(JSON.stringify(data), 'utf8')
-const decodeObject = (data) => JSON.parse(b4a.toString(data, 'utf8'))
-const randomBytes = (size) => b4a.from(crypto.randomBytes(size), 'hex')
-const randomString = (size) => encodeHex(randomBytes(size))
 
 let topic
 let topicBuffer
 if (environment === 'development') {
-	topic = '9f1e9ac48fa2a694fe99257a3d05e11d'
+	// topic = b4a.toString(crypto.randomBytes(32), 'hex')
+
+	topic = '0000000000000000000000000000000000000000000000000000000000000000'
 	topicBuffer = b4a.from(topic, 'hex')
+
+	// topicBuffer = crypto.randomBytes(32)
+	// topic = b4a.toString(topicBuffer, 'hex')
 } else {
-	topic = args[1] ? args[1] : randomString(32)
+	topic = args[1] ? args[1] : b4a.toString(crypto.randomBytes(64), 'hex')
 	topicBuffer = b4a.from(topic, 'hex')
 }
-
-const store = new Corestore(databaseFolder, id)
-await store.ready()
-
-// const core = new Hypercore(databaseFolder)
-const core = store.get({ name: 'db' })
-await core.ready()
-
-const db = new Hyperbee(core, { keyEncoding: 'utf-8', valueEncoding: 'json' })
-await db.ready()
 
 async function getOrCreateSeed(seedKey) {
 	let seedEntry = await db.get(seedKey)
 	let seed
 
 	if (seedEntry && seedEntry.value) {
-		seed = seedEntry.value
+		seed = seedEntry.value.buffer
 	} else {
-		seed = randomString(32)
+		seed = crypto.randomBytes(32)
 		await db.put(seedKey, seed)
 	}
 
 	return seed
 }
 
-const dhtBootstrap = { host: '127.0.0.1', port: 30001 }
+const store = new Corestore(databaseFolder, id)
+await store.ready()
 
-const dhtSeed = encodeHex(await getOrCreateSeed('dht-seed'))
+const core = store.get({ name: 'auctions' })
+const db = new Hyperbee(
+	core,
+	{
+		keyEncoding: 'utf-8',
+		valueEncoding: 'json'
+	}
+)
+await core.ready()
+
+const dhtSeed = await getOrCreateSeed('dht-seed')
 const dhtKeyPair = DHT.keyPair(dhtSeed)
-
 const dht = new DHT({
+	port: 40001,
 	keyPair: dhtKeyPair,
-	bootstrap: [dhtBootstrap]
+	bootstrap: [{ host: '127.0.0.1', port: 30001 }]
 })
 
-// const swarm = new Hyperswarm({ dht })
 const swarm = new Hyperswarm()
 
-const rpcSeed = encodeHex(await getOrCreateSeed('rpc-seed'))
+const rpcSeed = await getOrCreateSeed('rpc-seed')
 const rpc = new RPC({ seed: rpcSeed, dht })
-// const rpc = new RPC({ seed: rpcSeed, dth: swarm.dht })
-const rpcServer = rpc.createServer()
-await rpcServer.listen()
-const rpcServerPublicKey = decodeHex(rpcServer.publicKey)
 
-console.log('RPC server listening on:', rpcServerPublicKey)
+const server = rpc.createServer()
 
 // Pear.teardown(async () => {
 // 	console.log("Tearing down...")
@@ -107,35 +98,42 @@ console.log('RPC server listening on:', rpcServerPublicKey)
 // 	}
 //
 // 	if (server) {
-// 		await rpcServer.close()
+// 		await server.close()
 // 		console.log("Server closed.")
 // 	}
 //
 // 	console.log("Tear down complete.")
 // })
 
-rpcServer.on('listening', () => {
-	const serverPublicKey = rpcServer.address().publicKey.toString('hex')
+await server.listen()
+
+server.on('listening', () => {
+	const serverPublicKey = server.address().publicKey.toString('hex')
 	console.log(`RPC server is listening on publicKey: ${serverPublicKey}`)
 })
 
-rpcServer.on('connection', (rpc) => {
-	console.log("New connection established to the RPC server.")
+server.on('connection', (rpc) => {
+	console.log("New connection established to the RPC server.", rpc)
 })
 
-rpcServer.on('close', () => {
+server.on('close', () => {
 	console.log("RPC server closed.")
 })
 
-rpcServer.respond('echo', async (request) => {
-	const payload = decodeObject(request)
+const encodeHex = (data) => b4a.from(data, 'hex')
+const decodeHex = (data) => b4a.toString(data, 'hex')
+const encodeString = (data) => b4a.from(data, 'utf8')
+const decodeString = (data) => b4a.toString(data)
+const encodeObject = (data) => b4a.from(JSON.stringify(data), 'utf8')
+const decodeObject = (data) => JSON.parse(b4a.toString(data, 'utf8'))
 
-	console.log('Received request:', payload)
+server.respond('echo', (request) => {
+	console.log('echo:', request)
 
 	return request
 })
 
-rpcServer.respond('createAuction', async (request) => {
+server.respond('createAuction', async (request) => {
 	const { id, description, price, status } = decodeObject(request)
 
 	const item = { id, description, price, status: 'open', bids: [] }
@@ -152,12 +150,20 @@ rpcServer.respond('createAuction', async (request) => {
 	})
 })
 
-rpcServer.respond('auctionCreated', async (request) => {
+server.respond('auctionCreated', async (request) => {
 	const item = decodeObject(request)
 
 	await db.put(item.id, item)
 
 	console.log(`Successfully synchronized new auction ${id}`)
+})
+
+swarm.on('connection', (connection, peerInfo) => {
+	store.replicate(connection)
+
+	const peerPublicKey = decodeHex(peerInfo.publicKey)
+
+	console.log(`Swarm connected with the peer: ${peerPublicKey}`)
 })
 
 // const discovery = swarm.join(core.discoveryKey, {
@@ -170,24 +176,14 @@ discovery.flushed().then(() => {
 	console.log(`Successfully joined auction: ${topic}`)
 })
 
-swarm.on('connection', (connection, peerInfo) => {
-	// store.replicate(connection)
-
-	const peerPublicKey = decodeHex(peerInfo.publicKey)
-
-	console.log(`Swarm connected with the peer: ${peerPublicKey}`)
-})
-
 async function broadcastToAll(method, data) {
 	const encoded = encodeObject(data)
-
-	await rpc.request(encodeHex('8f7ab85e6cbbef3bbe8b74156eae658ad6478cc35744b47bfad71ec931a73ae0'), 'echo', encodeObject({ message: 'test' }))
 
 	for (const [key, peer] of swarm.peers) {
 		try {
 			// await rpc.request(peer.publicKey, method, encoded)
-			// const client = rpc.connect(peer.publicKey)
-			// await client.request('echo', b4a.from('hello world', 'utf8'))
+			const client = rpc.connect(peer.publicKey)
+			await client.request('echo', b4a.from('hello world', 'utf8'))
 		} catch (error) {
 			console.error(`Error broadcasting ${method}:`, error)
 		}

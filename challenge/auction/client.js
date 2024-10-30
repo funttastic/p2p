@@ -1,87 +1,83 @@
-// 'use strict'
-
-// const RPC = require('@hyperswarm/rpc')
-//
-// const DHT = require('hyperdht')
-//
-// const Hypercore = require('hypercore')
-//
-// const Hyperbee = require('hyperbee')
-//
-// const crypto = require('crypto')
-
 import RPC from '@hyperswarm/rpc';
 import Hyperbee from 'hyperbee';
 import Hypercore from 'hypercore';
 import crypto from 'hypercore-crypto';
 import DHT from 'hyperdht';
+import b4a from 'b4a';
 
-const main = async () => {
+const environment = 'development'
 
-	// hyperbee db
+// const arguments = Pear.config.args
+const args = process.argv.slice(2)
+console.log("Arguments:", args)
 
-	const hcore = new Hypercore('./db/rpc-client')
+// const id = Pear.config.args[0]
+const id = args[0]
 
-	const hbee = new Hyperbee(hcore, { keyEncoding: 'utf-8', valueEncoding: 'binary' })
+// const databaseFolder = Pear.config.storage
+const databaseFolder = `./resources/databases/${id}`
 
-	await hbee.ready()
+let topic
+let topicBuffer
+if (environment === 'development') {
+	// topic = b4a.toString(crypto.randomBytes(32), 'hex')
 
-	// resolved distributed hash table seed for key pair
+	topic = '0000000000000000000000000000000000000000000000000000000000000000'
+	topicBuffer = b4a.from(topic, 'hex')
 
-	let dhtSeed = (await hbee.get('dht-seed'))?.value
-
-	if (!dhtSeed) {
-
-		// not found, generate and store in db
-
-		dhtSeed = crypto.randomBytes(32)
-
-		await hbee.put('dht-seed', dhtSeed)
-
-	}
-
-	// start distributed hash table, it is used for rpc service discovery
-
-	const dht = new DHT({
-
-		port: 50001,
-
-		keyPair: DHT.keyPair(dhtSeed),
-
-		bootstrap: [{ host: '127.0.0.1', port: 30001 }] // note boostrap points to dht that is started via cli
-
-	})
-
-	// public key of rpc server, used instead of address, the address is discovered via dht
-
-	const serverPubKey = Buffer.from('b1fd2682a72f9bc35b98eeb1bf638b9f69247978b6d28e4060c6f0b82494aa02', 'hex')
-
-	// rpc lib
-
-	const rpc = new RPC({ dht })
-
-	// payload for request
-
-	const payload = { nonce: 126 }
-
-	const payloadRaw = Buffer.from(JSON.stringify(payload), 'utf-8')
-
-	// sending request and handling response
-
-	// see console output on server code for public key as this changes on different instances
-
-	const respRaw = await rpc.request(serverPubKey, 'ping', payloadRaw)
-
-	const resp = JSON.parse(respRaw.toString('utf-8'))
-
-	console.log(resp) // { nonce: 127 }
-
-	// closing connection
-
-	await rpc.destroy()
-
-	await dht.destroy()
-
+	// topicBuffer = crypto.randomBytes(32)
+	// topic = b4a.toString(topicBuffer, 'hex')
+} else {
+	topic = args[1] ? args[1] : b4a.toString(crypto.randomBytes(64), 'hex')
+	topicBuffer = b4a.from(topic, 'hex')
 }
 
-main().catch(console.error)
+const core = new Hypercore(databaseFolder)
+
+const db = new Hyperbee(core, { keyEncoding: 'utf-8', valueEncoding: 'binary' })
+await db.ready()
+
+const encodeHex = (data) => b4a.from(data, 'hex')
+const decodeHex = (data) => b4a.toString(data, 'hex')
+const encodeString = (data) => b4a.from(data, 'utf8')
+const decodeString = (data) => b4a.toString(data)
+const encodeObject = (data) => b4a.from(JSON.stringify(data), 'utf8')
+const decodeObject = (data) => JSON.parse(b4a.toString(data, 'utf8'))
+
+async function getOrCreateSeed(seedKey) {
+	let seedEntry = await db.get(seedKey)
+	let seed
+
+	if (seedEntry && seedEntry.value) {
+		seed = seedEntry.value
+	} else {
+		seed = crypto.randomBytes(32)
+		await db.put(seedKey, seed)
+	}
+
+	return seed
+}
+
+const dhtBootstrap = { host: '127.0.0.1', port: 30001 }
+
+const dhtSeed = await getOrCreateSeed('dht-seed')
+const dhtKeyPair = DHT.keyPair(dhtSeed)
+const dht = new DHT({
+	port: 50001,
+	keyPair: dhtKeyPair,
+	bootstrap: [dhtBootstrap]
+})
+
+const serverPubKey = Buffer.from('8f7ab85e6cbbef3bbe8b74156eae658ad6478cc35744b47bfad71ec931a73ae0', 'hex')
+
+const rpc = new RPC({ dht })
+
+const payload = {a: 'b', c: 1, d: true}
+const encoded = encodeObject(payload)
+const response = await rpc.request(serverPubKey, 'echo', encoded)
+const decoded = decodeObject(response)
+
+console.log(decoded)
+
+await rpc.destroy()
+await dht.destroy()

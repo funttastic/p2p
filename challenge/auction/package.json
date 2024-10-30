@@ -11,6 +11,7 @@
   "type": "module",
   "scripts": {
     "dev": "node index.js",
+		"dev-client": "node client.js",
 		"pear-dev": "pear run --dev .",
     "test": "node_modules/.bin/brittle test/*.test.js"
   },
