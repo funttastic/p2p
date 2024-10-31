@@ -21,18 +21,6 @@ import Corestore from 'corestore'
 // const { versions } = Pear
 // console.log(await versions())
 
-const environment = 'development'
-
-// const arguments = Pear.config.args
-const args = process.argv.slice(2)
-console.log("Arguments:", args)
-
-// const id = Pear.config.args[0]
-const id = args[0]
-
-// const databaseFolder = `${Pear.config.storage}/${id}`
-const databaseFolder = `./resources/databases/${id}`
-
 const encodeHex = (data) => b4a.from(data, 'hex')
 const decodeHex = (data) => b4a.toString(data, 'hex')
 const encodeString = (data) => b4a.from(data, 'utf8')
@@ -41,6 +29,18 @@ const encodeObject = (data) => b4a.from(JSON.stringify(data), 'utf8')
 const decodeObject = (data) => JSON.parse(b4a.toString(data, 'utf8'))
 const randomBytes = (size) => b4a.from(crypto.randomBytes(size), 'hex')
 const randomString = (size) => encodeHex(randomBytes(size))
+
+const environment = 'development'
+
+// const arguments = Pear.config.args
+const args = process.argv.slice(2)
+console.log("Arguments:", args)
+
+// const id = Pear.config.args[0]
+const id = args[0] ?? randomString(32)
+
+// const databaseFolder = `${Pear.config.storage}/${id}`
+const databaseFolder = `./resources/databases/${id}`
 
 let topic
 let topicBuffer
@@ -86,12 +86,12 @@ const dht = new DHT({
 	bootstrap: [dhtBootstrap]
 })
 
-// const swarm = new Hyperswarm({ dht })
-const swarm = new Hyperswarm()
+const swarm = new Hyperswarm({ dht })
+// const swarm = new Hyperswarm()
 
 const rpcSeed = encodeHex(await getOrCreateSeed('rpc-seed'))
-const rpc = new RPC({ seed: rpcSeed, dht })
-// const rpc = new RPC({ seed: rpcSeed, dth: swarm.dht })
+// const rpc = new RPC({ seed: rpcSeed, dht })
+const rpc = new RPC({ seed: rpcSeed, dth: swarm.dht })
 const rpcServer = rpc.createServer()
 await rpcServer.listen()
 const rpcServerPublicKey = decodeHex(rpcServer.publicKey)
@@ -135,16 +135,50 @@ rpcServer.respond('echo', async (request) => {
 	return request
 })
 
+rpcServer.respond('listAuctions', async (request) => {
+	const { } = decodeObject(request)
+
+	const auctions = db.getHeader()
+
+	return encodeObject({
+		payload: auctions,
+		status: 'ok'
+	})
+})
+
 rpcServer.respond('createAuction', async (request) => {
 	const { id, description, price, status, bids, closingInfo } = decodeObject(request)
 
 	const auction = { id, description, price, status: 'open', bids: [], closingInfo: {} }
+
+	const rawAuction = (await db.get(id))?.value
+
+	if (rawAuction && rawAuction.status === 'open') {
+		throw new Error('An auction with this id has already been created.')
+	}
 
 	await db.put(id, auction)
 
 	console.log(`Successfully created the auction ${id}`)
 
 	await broadcastToAll('auctionCreated', auction)
+
+	return encodeObject({
+		payload: auction,
+		status: 'ok'
+	})
+})
+
+rpcServer.respond('getAuction', async (request) => {
+	const { id } = decodeObject(request)
+
+	const auction = (await db.get(id))?.value
+
+	if (!auction || auction.status !== 'open') {
+		throw new Error('Auction not found or has already been closed.')
+	}
+
+	console.log(`Auction ${id}:`, auction)
 
 	return encodeObject({
 		payload: auction,
@@ -163,7 +197,7 @@ rpcServer.respond('makeBid', async (request) => {
 
 	auction.bids.push({ bidder, amount: bidAmount })
 
-	await db.put(id, auction.value)
+	await db.put(id, auction)
 
 	console.log(`Bid made for Auction ${id} by ${bidder} for ${bidAmount} USDT`)
 
@@ -198,7 +232,7 @@ rpcServer.respond('closeAuction', async (request) => {
 
 	await db.put(id, auction)
 
-	console.log(`Auction ${id} closed.`)
+	console.log(`Auction ${id} closed. Winner: ${closingInfo.winner}, Amount: ${closingInfo.amount} USDT`)
 
 	await broadcastToAll('auctionClosed', auction)
 
@@ -245,7 +279,7 @@ discovery.flushed().then(() => {
 })
 
 swarm.on('connection', (connection, peerInfo) => {
-	// store.replicate(connection)
+	store.replicate(connection)
 
 	const peerPublicKey = decodeHex(peerInfo.publicKey)
 
@@ -277,9 +311,14 @@ stdin.on('data', async (input) => {
 
 	if (command.startsWith('echo')) {
 		await broadcastToAll('echo', { message: parts[1] ?? 'Hello world!' })
+	} else if (command.startsWith('list')) {
+		payload = {}
+		rpc.request(rpcServer.publicKey, 'listAuctions', encodeObject(payload))
+			.then(console.log)
+			.catch(console.error)
 	} else if (command.startsWith('create')) {
 		const payload = {
-			id: parts[1] ?? `auction-${Date.now()}`,
+			id: parts[1] ?? `${Math.floor(Math.random() * 10)}`,
 			description: parts[2] ?? `Pic#${Math.floor(Math.random() * 1000)}`,
 			price: parts[3] ? parseFloat(parts[3]) : Math.floor(Math.random() * 100),
 			status: 'open',
@@ -287,17 +326,25 @@ stdin.on('data', async (input) => {
 			closingInfo: {}
 		}
 
-		rpc.request(rpcServerPublicKey, 'createAuction', encodeObject(payload))
+		rpc.request(rpcServer.publicKey, 'createAuction', encodeObject(payload))
+			.then(console.log)
+			.catch(console.error)
+	} else if (command.startsWith('get')) {
+		const payload = {
+			id: parts[1]
+		}
+
+		rpc.request(rpcServer.publicKey, 'getAuction', encodeObject(payload))
 			.then(console.log)
 			.catch(console.error)
 	} else if (command.startsWith('bid')) {
 		const payload = {
-			auctionId: parts[1],
+			id: parts[1],
 			bidder: id,
 			bidAmount: parseFloat(parts[2]) ?? Math.floor(Math.random() * 100)
 		}
 
-		rpc.request(rpcServerPublicKey, 'makeBid', encodeObject(payload))
+		rpc.request(rpcServer.publicKey, 'makeBid', encodeObject(payload))
 			.then(console.log)
 			.catch(console.error)
 	} else if (command.startsWith('close')) {
@@ -305,7 +352,7 @@ stdin.on('data', async (input) => {
 			id: parts[1]
 		}
 
-		rpc.request(rpcServerPublicKey, 'makeBid', encodeObject(payload))
+		rpc.request(rpcServer.publicKey, 'closeAuction', encodeObject(payload))
 			.then(console.log)
 			.catch(console.error)
 	}

@@ -68,7 +68,7 @@ const dht = new DHT({
 	bootstrap: [dhtBootstrap]
 })
 
-const serverPubKey = Buffer.from('8f7ab85e6cbbef3bbe8b74156eae658ad6478cc35744b47bfad71ec931a73ae0', 'hex')
+const serverPubKey = Buffer.from('e3e0c862cd43df96965bdae867515ba780ff20195337bbdf7b2721ad4e45c75d', 'hex')
 
 const rpc = new RPC({ dht })
 
